@@ -1,17 +1,18 @@
+// src/features/cart/cartSlice.js
+//
+// MODIFICADO: adicionada persistência automática no localStorage.
+// Toda ação que altera o carrinho salva o estado atualizado via setItem().
+// Ao iniciar a aplicação, o carrinho é restaurado via loadCartFromStorage().
+
 import { createSlice } from '@reduxjs/toolkit';
+import { getItem, setItem } from '../../services/localStorageService';
+
+function loadCartFromStorage() {
+  return getItem('CART') || [];
+}
 
 const initialState = {
-  cart: [],
-
-  // cart: [
-  //   {
-  //     pizzaId: 12,
-  //     name: 'Capricosa',
-  //     quantity: 2,
-  //     unitPrice: 15,
-  //     totalPrice: 32,
-  //   },
-  // ],
+  cart: loadCartFromStorage(),
 };
 
 const cartSlice = createSlice({
@@ -19,34 +20,56 @@ const cartSlice = createSlice({
   initialState,
   reducers: {
     addItem(state, action) {
-      // payload = newItem
-      state.cart.push(action.payload);
+      const existing = state.cart.find(
+        (item) => item.pizzaId === action.payload.pizzaId,
+      );
+
+      if (!existing) {
+        state.cart.push(action.payload);
+      } else {
+        existing.quantity++;
+        existing.totalPrice = existing.quantity * existing.unitPrice;
+      }
+
+      setItem('CART', state.cart);
     },
+
     deleteItem(state, action) {
-      // payload = pizzaId
       state.cart = state.cart.filter((item) => item.pizzaId !== action.payload);
+      setItem('CART', state.cart);
     },
+
     increaseItemQuantity(state, action) {
-      // payload = pizzaId
-      const item = state.cart.find((item) => item.pizzaId === action.payload);
+      const item = state.cart.find((i) => i.pizzaId === action.payload);
+      if (!item) return;
 
       item.quantity++;
       item.totalPrice = item.quantity * item.unitPrice;
+      setItem('CART', state.cart);
     },
+
     decreaseItemQuantity(state, action) {
-      const item = state.cart.find((item) => item.pizzaId === action.payload);
+      const item = state.cart.find((i) => i.pizzaId === action.payload);
+      if (!item) return;
 
       item.quantity--;
       item.totalPrice = item.quantity * item.unitPrice;
 
-      if (item.quantity === 0) cartSlice.caseReducers.deleteItem(state, action);
+      // Remove automaticamente se chegar a 0
+      if (item.quantity === 0) {
+        state.cart = state.cart.filter((i) => i.pizzaId !== action.payload);
+      }
+
+      setItem('CART', state.cart);
     },
+
     clearCart(state) {
       state.cart = [];
+      setItem('CART', []);
     },
   },
 });
-console.log(cartSlice);
+
 export const {
   addItem,
   deleteItem,
@@ -57,6 +80,7 @@ export const {
 
 export default cartSlice.reducer;
 
+// ─── Selectors ────────────────────────────────────────────────────────────────
 export const getCart = (state) => state.cart.cart;
 
 export const getTotalCartQuantity = (state) =>
